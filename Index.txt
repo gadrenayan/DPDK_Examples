@@ -1,0 +1,17 @@
+examples/ip_pipeline/Makefile
+examples/ip_pipeline/cli.c
+examples/ip_pipeline/examples/firewall.cli
+examples/ip_pipeline/main.c
+examples/ip_pipeline/pipeline.c
+examples/ip_pipeline/pipeline.h
+examples/ip_pipeline/swq.c
+examples/ip_pipeline/tap.c
+examples/ip_pipeline/tap.h
+examples/ip_pipeline/thread.c
+lib/librte_pipeline/rte_pipeline.c
+lib/librte_pipeline/rte_pipeline.h
+lib/librte_port/rte_port.h
+lib/librte_port/rte_port_fd.c
+lib/librte_port/rte_port_fd.h
+lib/librte_port/rte_port_ring.c
+
