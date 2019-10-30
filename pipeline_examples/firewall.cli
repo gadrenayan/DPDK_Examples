@@ -1,0 +1,72 @@
+; SPDX-License-Identifier: BSD-3-Clause
+; Copyright(c) 2010-2018 Intel Corporation
+
+;  A simple implementation for this functional pipeline is presented below.
+
+;                  Packet Rx                  Traffic Management               Packet Tx
+;                   Ingress                    (Pass-Through)                   Egress
+;             _____________________        ______________________        _____________________
+;            |                     |      |                      |      |                     |
+;            |                     |      |                      |      |                     |
+; PKT-GEN    |                     |      |                      |      |                     | PKT-RECV
+;    ------> |        (P1)         | SWQ0 |         (P2)         | SWQ1 |        (P3)         |----->
+;            |                     |----->|                      |----->|                     |
+;            |                     |      |                      |      |                     |
+;            |                     |      |                      |      |                     |
+;            |_____________________|      |______________________|      |_____________________|
+;                       |                             |                            |
+
+
+;
+; Input packet: Ethernet/IPv4
+;
+; Packet buffer layout:
+; #   Field Name            Offset (Bytes)      Size (Bytes)
+; 0   Mbuf                  0                   128
+; 1   Headroom              128                 128
+; 2   Ethernet header       256                 14
+; 3   IPv4 header           270                 20
+
+;Create a tap device with name gnatap
+;this is a placeholder since internally we
+;switch to named pipes with a fixed path
+tap gnatap
+
+;Create Mempool Name: MEMPOOL0 buffer size 2304 bytes 
+;pool entries 32K buffers cache size 256 run on socket 0
+mempool MEMPOOL0 buffer 2304 pool 32K cache 256 cpu 0
+
+;Create table action profile Name: AP0 for ipv4
+;start match at offset 270 bytes for ipv4 header
+;fwd = Forward to next pipeline table, output port
+table action profile AP0 ipv4 offset 270 fwd
+
+;Create swq Name SWQ0 SWQ1 size 4096 on socket 1
+swq SWQ0 size 4096 cpu 0
+swq SWQ1 size 4096 cpu 0
+
+;Create Pipeline: INGRESS run with 10 ms on socket 0
+;port in points to named pipe, port out using SWQ1
+pipeline INGRESS period 10 offset_port_id 0 cpu 0
+pipeline INGRESS port in bsz 32 tap gnatap mempool MEMPOOL0 mtu 1500
+pipeline INGRESS port out bsz 32 swq SWQ0
+pipeline INGRESS table match acl ipv4 offset 270 size 4K action AP0
+
+;Create Pipeline: PASSTHROUGH run with 10 ms on socket 0
+;port in using SWQ0, port out using SWQ1
+pipeline PASSTHROUGH period 10 offset_port_id 0 cpu 0
+pipeline PASSTHROUGH port in bsz 32 swq SWQ0
+pipeline PASSTHROUGH port out bsz 32 swq SWQ1
+pipeline PASSTHROUGH table match acl ipv4 offset 270 size 4K action AP0
+
+;Create Pipeline: EGRESS run with 10 ms on socket 0
+;port in using SWQ1, no port out
+pipeline EGRESS period 10 offset_port_id 0 cpu 0
+pipeline EGRESS port in bsz 32 swq SWQ1
+pipeline EGRESS port out bsz 32 swq SWQ0
+pipeline EGRESS table match acl ipv4 offset 270 size 4K action AP0
+
+thread 1 pipeline INGRESS enable
+thread 2 pipeline PASSTHROUGH enable
+thread 3 pipeline EGRESS enable
+
